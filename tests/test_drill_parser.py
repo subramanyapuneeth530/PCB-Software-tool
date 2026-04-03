@@ -90,3 +90,42 @@ class TestExcellonParser:
     def test_empty_file(self, tmp_path):
         holes = _parse_drill("", tmp_path)
         assert holes == []
+
+    def test_decimal_coord_format_inch(self, tmp_path):
+        """KiCad exports inch drills with decimal coords: X3.9469Y-3.6122.
+        Regression for bug where digit-only regex silently dropped all such holes."""
+        holes = _parse_drill("""\
+            M48
+            ; FORMAT={-:-/ absolute / inch / decimal}
+            INCH
+            T1C0.0197
+            T2C0.0315
+            %
+            G90
+            G05
+            T1
+            X3.9469Y-3.6122
+            X3.9469Y-3.6427
+            T2
+            X1.0000Y-2.0000
+            M30
+        """, tmp_path)
+        assert len(holes) == 3
+        # X3.9469 inches -> positive mm;  Y-3.6122 inches -> negative mm
+        assert holes[0].x == pytest.approx(3.9469 * 25.4, rel=1e-4)
+        assert holes[0].y == pytest.approx(-3.6122 * 25.4, rel=1e-4)
+        assert holes[0].diameter == pytest.approx(0.0197 * 25.4, rel=1e-4)
+
+    def test_unit_ordering_inch_before_tool(self, tmp_path):
+        """INCH declared before tool definition — diameter must still be converted."""
+        holes = _parse_drill("""\
+            M48
+            INCH,LZ
+            T1C0.040
+            %
+            T1
+            X01000Y01000
+            M30
+        """, tmp_path)
+        assert len(holes) == 1
+        assert holes[0].diameter == pytest.approx(0.040 * 25.4, rel=1e-3)

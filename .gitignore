@@ -64,3 +64,8 @@ desktop.ini
 
 # ── User-specific settings saved by the app ──────────
 settings.json
+
+# ── Local Gerber test folders (not part of repo) ──────
+gerber/
+ESP32-S3+C3-FAB/
+Blixten R2/

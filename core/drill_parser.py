@@ -12,15 +12,18 @@ from .primitives import DrillHole
 
 class ExcellonParser:
     def __init__(self):
-        self.tools: dict[str, float] = {}    # tool_id → diameter mm
+        self.tools: dict[str, float] = {}    # tool_id → raw value (pre-conversion)
+        self._tools_raw: dict[str, float] = {}  # raw inch values before unit known
         self.holes: list[DrillHole]  = []
         self.unit_mm    = True
         self.cur_tool   = ""
         self.cur_diam   = 0.0
         self.plated     = True
+        self._units_set = False      # whether METRIC/INCH seen yet
         # format: (integer_digits, decimal_digits)
         self.fmt        = (2, 4)
         self.leading_zeros = True   # True=leading suppressed, False=trailing
+        self._decimal_coords = False # True when FORMAT uses decimal notation
 
     def parse(self, filepath: str) -> list[DrillHole]:
         try:
@@ -38,8 +41,12 @@ class ExcellonParser:
 
             # Header end markers
             if line in ('%', 'M95', 'M48'):
-                if line == 'M48': header = True
-                else: header = False
+                if line == 'M48':
+                    header = True
+                else:
+                    # End of header — now resolve tool diameters with known units
+                    self._resolve_tools()
+                    header = False
                 continue
 
             if header:
@@ -50,32 +57,44 @@ class ExcellonParser:
         return self.holes
 
     def _parse_header(self, line: str):
-        # Tool definition  T1C0.800
+        # Tool definition  T1C0.800  — store raw, convert after units known
         m = re.match(r'T(\d+)C([\d.]+)', line)
         if m:
             tid = m.group(1)
-            d   = float(m.group(2))
-            if not self.unit_mm:
-                d *= 25.4
-            self.tools[tid] = d
+            self._tools_raw[tid] = float(m.group(2))
             return
 
         # Units
         if 'METRIC' in line:
             self.unit_mm = True
+            self._units_set = True
         elif 'INCH' in line or 'ENGLISH' in line:
             self.unit_mm = False
+            self._units_set = True
 
-        # Format  FMAT,2  or  00.0000
+        # Decimal coordinate format detection
+        if 'decimal' in line.lower():
+            self._decimal_coords = True
+
+        # Integer format spec  00.0000
         m2 = re.search(r'(\d+)\.(\d+)', line)
-        if m2:
+        if m2 and not self._decimal_coords:
             self.fmt = (len(m2.group(1)), len(m2.group(2)))
 
         # Plated / non-plated
         if 'NPTH' in line.upper():
             self.plated = False
 
+    def _resolve_tools(self):
+        """Convert raw tool diameters to mm using the now-known unit."""
+        for tid, raw in self._tools_raw.items():
+            self.tools[tid] = raw if self.unit_mm else raw * 25.4
+
     def _parse_body(self, line: str):
+        # Skip G-code motion / mode lines that aren't coordinates
+        if re.match(r'^G\d+', line):
+            return
+
         # Tool select  T3
         m = re.match(r'^T(\d+)$', line)
         if m:
@@ -84,16 +103,16 @@ class ExcellonParser:
             self.cur_diam = self.tools.get(tid, 0.0)
             return
 
-        # Inline tool + coordinate  T1X123456Y654321
-        m2 = re.match(r'^T(\d+)(X[+-]?\d+Y[+-]?\d+)', line)
+        # Inline tool + coordinate  T1X...Y...  (integer or decimal)
+        m2 = re.match(r'^T(\d+)(X[+-]?[\d.]+Y[+-]?[\d.]+)', line)
         if m2:
             tid = m2.group(1)
             self.cur_tool = tid
             self.cur_diam = self.tools.get(tid, 0.0)
             line = m2.group(2)
 
-        # Coordinate  X123456Y654321
-        m3 = re.match(r'^X([+-]?\d+)Y([+-]?\d+)', line)
+        # Coordinate  X...Y...  (integer OR decimal)
+        m3 = re.match(r'^X([+-]?[\d.]+)Y([+-]?[\d.]+)', line)
         if m3:
             x = self._coord(m3.group(1))
             y = self._coord(m3.group(2))
@@ -107,11 +126,24 @@ class ExcellonParser:
             pass
 
     def _coord(self, s: str) -> float:
+        """Convert a coordinate string to mm.
+        Handles both:
+          - Integer-encoded:  '394690' with fmt=(2,4) -> 3.9469
+          - Decimal-encoded:  '3.9469'  (pass-through)
+        """
         neg = s.startswith('-')
-        digits = s.lstrip('-+')
+        raw = s.lstrip('-+')
+
+        # Decimal notation — already has a dot
+        if '.' in raw:
+            val = float(raw)
+            val = -val if neg else val
+            return val if self.unit_mm else val * 25.4
+
+        # Integer-encoded with zero-suppression
         fi, fd = self.fmt
         total  = fi + fd
-        digits = digits.zfill(total)
-        val = float(digits[:-fd] + '.' + digits[-fd:]) if fd else float(digits)
-        val = -val if neg else val
+        raw    = raw.zfill(total)
+        val    = float(raw[:-fd] + '.' + raw[-fd:]) if fd else float(raw)
+        val    = -val if neg else val
         return val if self.unit_mm else val * 25.4
