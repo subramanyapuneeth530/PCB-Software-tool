@@ -1,0 +1,66 @@
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+*.so
+
+# ── Virtual environment ────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# ── PyInstaller build output ──────────────────────────
+dist/
+*.spec.bak
+
+# ── Testing / coverage ────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ── IDE / editor ──────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.kate-swp
+
+# ── OS ────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ── Logs / tmp ────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+
+# ── Qt resources (compiled) ───────────────────────────
+*.rcc
+
+# ── User-specific settings saved by the app ──────────
+settings.json
