@@ -274,7 +274,7 @@ The core modules have no Qt dependency and run without a display:
 python -m pytest tests/ -v
 ```
 
-35 tests covering: parser correctness, Gerber X2 attributes, Excellon drill parsing, spatial index connectivity, flood-fill, geometry helpers, DRC detection, and layer auto-detection.
+77 tests covering: parser correctness, Gerber X2 attributes, Excellon drill scaling/decimal formats, spatial index connectivity, flood-fill, geometry helpers, DRC detection, and layer auto-detection.
 
 ---
 
@@ -298,6 +298,16 @@ Gerber is a manufacturing format. It describes copper shapes, not schematic inte
 - Pin numbers — unless Gerber X2 is present
 - Net names — unless Gerber X2 is present
 - Component values (10 kΩ, 100 nF) — schematic / BOM only
+
+---
+
+## Recent Updates (Stability & Integration)
+
+The software has undergone a rigorous cycle of integration testing against complex industry datasets (e.g. A64-OlinuXino, ESP32-S3 custom boards), identifying and fixing corner-case rendering and thread-lifecycle bugs:
+
+- **Excellon Drill Patch**: The parser was refactored with a robust system to track imperial/metric formatting safely across both `00.0000` integers and direct decimal representation `X3.9469` bypassing regex stripping faults. 
+- **Qt Engine Hotfixes**: Eliminated silent C++ UI lifecycle crashing bugs connected to label updates within the info panel overlay. Properly guarded QThread deallocation (`deleteLater()`) preventing Zombie background threads hanging operations post-close.
+- **Headless Parser Utility**: For bulk diagnostic checks, a CLI analyzer automatically validates directory folders reporting total element extraction numbers independently from the core GUI wrapper.
 
 ---
 
