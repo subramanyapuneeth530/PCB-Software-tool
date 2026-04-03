@@ -179,6 +179,9 @@ class PCBCanvas(QWidget):
         worker.progress.connect(self.statusMsg.emit)
         worker.done.connect(self._on_adj_done)
         worker.done.connect(thread.quit)
+        # Proper Qt cleanup: delete worker/thread after thread finishes
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
         thread.started.connect(worker.run)
         thread.start()
         self._worker_thread = thread

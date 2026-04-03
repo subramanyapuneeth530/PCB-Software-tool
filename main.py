@@ -173,11 +173,15 @@ class InfoPanel(QWidget):
             self._il.insertWidget(pos, lv); pos += 1
 
     def _clear(self):
+        # Remove all dynamically added rows (everything except self._empty)
         while self._il.count() > 1:
             item = self._il.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self._il.insertWidget(0, self._empty)
+            w = item.widget() if item else None
+            if w and w is not self._empty:
+                w.deleteLater()
+        # Ensure _empty is the first (and only non-stretch) item
+        if self._il.indexOf(self._empty) < 0:
+            self._il.insertWidget(0, self._empty)
 
 
 # ── DRC dialog ────────────────────────────────────────────────────
@@ -363,7 +367,8 @@ class MainWindow(QMainWindow):
     def _build_toolbar(self):
         tb = QToolBar("Main")
         tb.setMovable(False)
-        tb.setIconSize(type('S', (), {'width': lambda: 16, 'height': lambda: 16})())
+        from PyQt6.QtCore import QSize
+        tb.setIconSize(QSize(16, 16))
         self.addToolBar(tb)
 
         def act(label: str, slot, tip: str = "", shortcut: str = "",
@@ -406,17 +411,15 @@ class MainWindow(QMainWindow):
         tb.addWidget(self._theme_combo)
 
         # Spacer + coord label
-        sp = QWidget(); sp.setSizePolicy(
-            sp.sizePolicy().horizontalPolicy().Expanding,
-            sp.sizePolicy().verticalPolicy().Fixed)
+        sp = QWidget()
+        from PyQt6.QtWidgets import QSizePolicy
+        sp.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         tb.addWidget(sp)
 
     # ── central widget ────────────────────────────────────────────
 
     def _build_central(self):
         self._canvas = PCBCanvas(self._theme)
-        self._canvas.statusMsg.connect(self._sb.showMessage
-                                       if hasattr(self, '_sb') else lambda m: None)
         self._canvas.primitiveClicked.connect(self._on_prim_clicked)
         self._canvas.measureDone.connect(lambda d: None)
 
